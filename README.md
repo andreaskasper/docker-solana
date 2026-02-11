@@ -25,6 +25,14 @@
 
 ---
 
+### Video Tutorial
+
+How to create a token/coin:
+
+[![Create a Solana Token](https://img.youtube.com/vi/befUVytFC80/0.jpg)](https://www.youtube.com/watch?v=befUVytFC80)
+
+---
+
 ### Quick Start
 
 #### Create a new Solana Wallet
@@ -109,14 +117,6 @@ docker build --build-arg SOLANA_VERSION=v2.1.21 -t mysolana:cli src/
 # Or the latest stable (check https://github.com/anza-xyz/agave/releases)
 docker build --build-arg SOLANA_VERSION=v3.1.8 -t mysolana:cli src/
 ```
-
----
-
-### Video Tutorial
-
-How to create a token/coin:
-
-[![Create a Solana Token](https://img.youtube.com/vi/befUVytFC80/0.jpg)](https://www.youtube.com/watch?v=befUVytFC80)
 
 ---
 
