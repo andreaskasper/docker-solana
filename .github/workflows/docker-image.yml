@@ -1,42 +1,76 @@
 name: Docker Image CI
 
+# ─── TRIGGERS ────────────────────────────────────────────────────────────────
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
   schedule:
+    # Rebuild automatically every Sunday at 00:00 UTC.
+    # This keeps the image fresh (Debian security patches, spl-token-cli updates).
     - cron: '0 0 * * 0'
+  # Allow manual runs from the GitHub Actions UI
   workflow_dispatch:
-#weekly
-  
 
+# ─── JOBS ────────────────────────────────────────────────────────────────────
 jobs:
-
   build:
-
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
 
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-#      -
-#        name: Set up QEMU
-#        uses: docker/setup-qemu-action@v1
-#      -
-#        name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v1
-      -
-        name: Login to DockerHub
-        uses: docker/login-action@v1
+
+      # 1) Check out the repository
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # 2) QEMU — enables emulation of non-native CPU architectures.
+      #    Required for building linux/arm64 images on an amd64 runner.
+      - name: 🖥️ Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 3) Buildx — extended Docker build engine (multi-platform, cache, etc.)
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4) Log in to Docker Hub using repository secrets.
+      #    Required secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+      #    Set them at: https://github.com/andreaskasper/docker-solana/settings/secrets
+      - name: 🔐 Login to DockerHub
+        uses: docker/login-action@v3
         with:
-          username: andreaskasper
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Build and push
-        uses: docker/build-push-action@v2
+
+      # 5) Extract metadata (tags, labels) automatically from Git context.
+      #    Produces: andreaskasper/solana:cli, andreaskasper/solana:latest, etc.
+      - name: 🏷️ Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: andreaskasper/solana
+          tags: |
+            type=raw,value=cli
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      # 6) Build the image and push to Docker Hub.
+      #    Only pushes on merge to main (not on pull_request).
+      #    GitHub Actions cache is used to speed up repeated builds.
+      #    Note: linux/arm64 is listed but Agave (Solana CLI) only ships
+      #    pre-built amd64 binaries. arm64 will compile from source via cargo,
+      #    which works but takes significantly longer.
+      - name: 🐋 Build and push
+        uses: docker/build-push-action@v5
         with:
           context: src/.
-          push: true
-          tags: andreaskasper/solana:cli
+          platforms: linux/amd64
+          # To enable arm64 builds, change platforms to:
+          # platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer cache via GitHub Actions cache backend (no extra tokens needed)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
