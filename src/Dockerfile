@@ -38,9 +38,18 @@ RUN sh -c "$(curl -sSfL https://release.anza.xyz/${SOLANA_VERSION}/install)"
 # ─── RUST + SPL-TOKEN-CLI ────────────────────────────────────────────────────
 # spl-token-cli must be compiled from source via cargo.
 # After install, remove the cargo registry/git cache to keep the image lean.
+# --locked is not optional here. spl-token-cli ships a Cargo.lock, and that
+# lock holds a delicate balance: solana-address pulls wincode 0.5.3 while
+# solana-hash, solana-signature and the agave-* crates pull wincode 0.4.9.
+# Two versions of the same crate coexist on purpose, and the trait impls line
+# up only for that exact combination. Without --locked, cargo re-resolves to
+# whatever is newest and semver-compatible, the alignment breaks, and the
+# build dies with "the trait bound `RewardType: wincode::SchemaRead` is not
+# satisfied" - which is a diamond-dependency mismatch wearing the mask of a
+# compiler error. This is what broke the image between April and August 2026.
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
     && export PATH="/root/.cargo/bin:/root/.local/share/solana/install/active_release/bin:$PATH" \
-    && cargo install spl-token-cli \
+    && cargo install spl-token-cli --locked \
     && rm -rf /root/.cargo/registry /root/.cargo/git
 
 # ─── ENTRYPOINT ──────────────────────────────────────────────────────────────
